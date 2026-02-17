@@ -1,0 +1,160 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum BoardRole {
+  ADMIN
+  WORKER
+}
+
+enum ActivityType {
+  BOARD_CREATED
+  BOARD_UPDATED
+  BOARD_DELETED
+  MEMBER_ADDED
+  MEMBER_REMOVED
+  MEMBER_ROLE_CHANGED
+  LIST_CREATED
+  LIST_UPDATED
+  LIST_DELETED
+  LIST_REORDERED
+  TASK_CREATED
+  TASK_UPDATED
+  TASK_DELETED
+  TASK_MOVED
+  TASK_ASSIGNED
+  TASK_UNASSIGNED
+  LABEL_ADDED
+  LABEL_REMOVED
+}
+
+model User {
+  id        String   @id @default(cuid())
+  name      String
+  email     String   @unique
+  password  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  ownedBoards   Board[]        @relation("BoardOwner")
+  memberships   BoardMember[]
+  assignedTasks TaskAssignee[]
+  activities    Activity[]
+
+  @@index([email])
+}
+
+model Board {
+  id          String   @id @default(cuid())
+  title       String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  ownerId String
+  owner   User @relation("BoardOwner", fields: [ownerId], references: [id])
+
+  members    BoardMember[]
+  lists      TaskList[]
+  activities Activity[]
+
+  @@index([ownerId])
+}
+
+model BoardMember {
+  id        String    @id @default(cuid())
+  role      BoardRole @default(WORKER)
+  createdAt DateTime  @default(now())
+
+  boardId String
+  userId  String
+
+  board Board @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([boardId, userId])
+  @@index([boardId])
+  @@index([userId])
+}
+
+model TaskList {
+  id        String   @id @default(cuid())
+  title     String
+  position  Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  boardId String
+  board   Board @relation(fields: [boardId], references: [id], onDelete: Cascade)
+
+  tasks Task[]
+
+  @@index([boardId, position])
+  @@index([boardId])
+}
+
+model Task {
+  id          String   @id @default(cuid())
+  title       String
+  description String?
+  position    Int
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  listId String
+  list   TaskList @relation(fields: [listId], references: [id], onDelete: Cascade)
+
+  assignees TaskAssignee[]
+  labels    Label[]
+
+  @@index([listId, position])
+  @@index([listId])
+}
+
+model TaskAssignee {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  taskId String
+  userId String
+
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([taskId, userId])
+  @@index([taskId])
+  @@index([userId])
+}
+
+model Label {
+  id    String @id @default(cuid())
+  name  String
+  color String
+
+  taskId String
+  task   Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@unique([taskId, name])
+  @@index([taskId])
+}
+
+model Activity {
+  id        String       @id @default(cuid())
+  type      ActivityType
+  metadata  Json? // Store additional data like old/new values, moved from/to lists, etc.
+  createdAt DateTime     @default(now())
+
+  boardId String
+  board   Board  @relation(fields: [boardId], references: [id], onDelete: Cascade)
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([boardId, createdAt])
+  @@index([boardId])
+}
