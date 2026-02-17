@@ -1,5 +1,5 @@
 {
-  "name": "admintaskmanagement-backend",
+  "name": "taskflow-backend",
   "version": "1.0.0",
   "description": "This is the end to end backend Repo for AdminTaskManagement",
   "main": "dist/index.js",
