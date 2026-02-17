@@ -1,73 +1,186 @@
-# Welcome to your Lovable project
+# TaskFlow — Frontend
 
-## Project info
+React + TypeScript Kanban board frontend with real-time updates via Socket.IO. Hosted on **Vercel**.
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+🌐 **Live URL:** https://taskflow.ankitraj.fun
 
-## How can I edit this code?
+---
 
-There are several ways of editing your application.
+## 🔐 Demo Credentials
 
-**Use Lovable**
+| Field    | Value            |
+|----------|------------------|
+| Email    | hintro@gmail.com |
+| Password | Hintro@12        |
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
+---
 
-Changes made via Lovable will be committed automatically to this repo.
+## ⚙️ Tech Stack
 
-**Use your preferred IDE**
+- React + TypeScript (Vite)
+- Zustand — state management
+- Socket.IO Client — real-time sync
+- @dnd-kit — drag and drop
+- TailwindCSS + shadcn/ui
+- React Router v6
+- Axios — HTTP client
+- Tanstack React Query
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+---
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+## 🛠️ Local Setup
 
-Follow these steps:
+### 1. Install dependencies
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+```bash
+cd frontend
+npm install
+```
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+### 2. Create `.env` file
 
-# Step 3: Install the necessary dependencies.
-npm i
+```env
+VITE_API_URL=http://localhost:8000
+```
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
+> For production this points to your AWS backend URL.
+
+### 3. Start dev server
+
+```bash
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+App runs at `http://localhost:5173`
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+---
 
-**Use GitHub Codespaces**
+## 🗂️ Project Structure
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+```
+frontend/
+└── src/
+    ├── client/
+    │   └── axiosClient.ts         # Axios instance with base URL + credentials
+    ├── components/
+    │   ├── ActivitySidebar.tsx    # Real-time activity feed sidebar
+    │   ├── BoardCard.tsx          # Board card on dashboard
+    │   ├── CreateBoardModal.tsx   # Modal to create a new board
+    │   ├── KanbanList.tsx         # A single kanban column
+    │   ├── ManageMembersModal.tsx # Add/remove/role members
+    │   ├── TaskCardOverlay.tsx    # Drag overlay card
+    │   └── TaskDetailsModal.tsx   # Task detail view modal
+    ├── contexts/
+    │   ├── AuthContext.tsx        # Login/logout/user state
+    │   └── SocketContext.tsx      # Socket.IO connection + isConnected state
+    ├── layouts/
+    │   └── AppLayout.tsx          # Shared page layout
+    ├── pages/
+    │   ├── Login.tsx              # Login page
+    │   ├── Signup.tsx             # Register page
+    │   ├── Dashboard.tsx          # All boards view
+    │   └── BoardView.tsx          # Kanban board page
+    ├── stores/
+    │   ├── useBoardStore.ts       # Single board state + socket handlers
+    │   └── useBoardsStore.ts      # All boards list state + socket handlers
+    └── types/
+        └── board.types.ts         # Shared TypeScript types
+```
 
-## What technologies are used for this project?
+---
 
-This project is built with:
+## 🧭 Routes
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+| Route             | Page        | Description                  |
+|-------------------|-------------|------------------------------|
+| `/`               | Redirect    | Redirects to `/login`        |
+| `/login`          | Login       | Sign in with email/password  |
+| `/signup`         | Signup      | Create new account           |
+| `/dashboard`      | Dashboard   | View and manage all boards   |
+| `/boards/:boardId`| BoardView   | Kanban board with DnD        |
 
-## How can I deploy this project?
+---
 
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
+## ⚡ Real-Time Architecture
 
-## Can I connect a custom domain to my Lovable project?
+The frontend uses **two Zustand stores** that each hold a socket reference:
 
-Yes, you can!
+- `useBoardsStore` — handles `boardCreated`, `boardUpdated`, `boardDeleted` events on the Dashboard
+- `useBoardStore` — handles all task/list/member/label events inside a Board
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+### Socket wiring in `BoardView.tsx`
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+```tsx
+// 1. Wire socket handlers to store
+useEffect(() => {
+  setSocket(socket);
+  return () => setSocket(null);
+}, [socket]);
+
+// 2. Fetch board data on mount
+useEffect(() => {
+  if (!boardId) return;
+  fetchBoard(boardId);
+  fetchActivities(boardId);
+  return () => clearBoard();
+}, [boardId]);
+
+// 3. Join/leave board room
+useEffect(() => {
+  if (!socket || !boardId) return;
+  socket.emit("joinBoard", boardId);
+  return () => socket.emit("leaveBoard", boardId);
+}, [socket, boardId]);
+```
+
+---
+
+## ⏳ Important — Wait After Actions
+
+After clicking any button (move task, add member, assign user, etc.) **please wait 1–2 seconds** before performing another action. This allows the Socket.IO event to propagate to all connected clients.
+
+> If testing with two browser windows on the same board, act in window A then wait briefly — window B will update automatically without refreshing.
+
+---
+
+## 👥 Role-Based Permissions
+
+| Role   | Can do                                               |
+|--------|------------------------------------------------------|
+| ADMIN  | Full access — create/edit/delete lists, tasks, members, drag any task |
+| WORKER | Can only drag/move tasks that are **assigned to them** |
+
+---
+
+## 🚀 Deployment (Vercel)
+
+The frontend is deployed on Vercel.
+
+### Environment variable to set in Vercel dashboard:
+
+```env
+VITE_API_URL=https://your-aws-backend-url
+```
+
+### Build settings:
+- **Framework:** Vite
+- **Build command:** `npm run build`
+- **Output directory:** `dist`
+
+---
+
+## 🧪 Testing Real-Time
+
+1. Open `https://taskflow.ankitraj.fun` in two different browsers (or normal + incognito)
+2. Log in with different accounts on each
+3. Have both open the **same board**
+4. Perform an action on one — the other updates automatically
+5. The green **Live** dot on the Dashboard confirms socket is connected
+
+---
+
+## 🐛 Known Behaviors
+
+- Drag and drop updates **optimistically** for the person dragging — socket then syncs to others
+- If the socket disconnects, the green Live indicator disappears — refresh to reconnect
+- Cookie-based auth (`auth_token` HTTP-only cookie) is used — no localStorage tokens
