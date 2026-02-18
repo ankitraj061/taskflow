@@ -1,4 +1,4 @@
-import type { Task } from "@/types";
+import type { Task } from "../types/board.types";
 
 interface Props {
   task: Task;
