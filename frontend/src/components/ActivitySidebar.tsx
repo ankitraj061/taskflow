@@ -1,15 +1,17 @@
 import type { Activity } from "@/types/board.types";
-import { X, Clock } from "lucide-react";
+import { X, Clock, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface Props {
   activities: Activity[];
+  isLoading?: boolean;
   onClose: () => void;
 }
 
 type ActivityMetadata = Record<string, string | number | boolean | undefined>;
 
-export const ActivitySidebar = ({ activities, onClose }: Props) => {
+export const ActivitySidebar = ({ activities, isLoading = false, onClose }: Props) => {
   const formatTime = (dateStr: string) => {
     const d = new Date(dateStr);
     const now = new Date();
@@ -66,15 +68,27 @@ export const ActivitySidebar = ({ activities, onClose }: Props) => {
   };
 
   return (
-    <div className="w-72 border-l border-border bg-card shrink-0 flex flex-col animate-slide-in-right">
-      <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+    <div className="w-72 border-l border-border/60 bg-card/95 backdrop-blur-sm shrink-0 flex flex-col animate-slide-in-right shadow-lg">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-border/60 bg-card/50">
         <h2 className="text-sm font-semibold text-foreground">Activity</h2>
         <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={onClose}>
           <X className="h-3.5 w-3.5" />
         </Button>
       </div>
       <div className="flex-1 overflow-y-auto p-4 space-y-3 kanban-scrollbar">
-        {activities.length === 0 ? (
+        {isLoading ? (
+          <div className="space-y-3">
+            {[1, 2, 3, 4, 5].map((i) => (
+              <div key={i} className="flex gap-2.5">
+                <Skeleton className="h-6 w-6 rounded-full shrink-0" />
+                <div className="flex-1 space-y-1">
+                  <Skeleton className="h-3 w-full" />
+                  <Skeleton className="h-2 w-20" />
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : activities.length === 0 ? (
           <p className="text-xs text-muted-foreground text-center py-8">
             No activity yet
           </p>

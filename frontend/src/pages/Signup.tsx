@@ -40,14 +40,16 @@ const Signup = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background p-4">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-background to-primary/5 p-4">
       <div className="w-full max-w-sm animate-fade-in">
-        <div className="flex items-center justify-center gap-2 mb-8">
-          <Kanban className="h-7 w-7 text-primary" />
-          <span className="text-xl font-bold tracking-tight text-foreground">TaskFlow</span>
+        <div className="flex items-center justify-center gap-2 mb-10">
+          <div className="p-2 rounded-lg bg-primary/10">
+            <Kanban className="h-7 w-7 text-primary" />
+          </div>
+          <span className="text-2xl font-bold tracking-tight text-foreground bg-gradient-to-r from-foreground to-primary bg-clip-text text-transparent">TaskFlow</span>
         </div>
 
-        <div className="bg-card border border-border rounded-lg p-6 shadow-sm">
+        <div className="bg-card/95 backdrop-blur-sm border border-border/60 rounded-xl p-6 shadow-xl">
           <h1 className="text-lg font-semibold text-card-foreground mb-1">Create account</h1>
           <p className="text-sm text-muted-foreground mb-6">Get started with TaskFlow</p>
 

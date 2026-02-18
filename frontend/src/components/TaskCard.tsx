@@ -1,11 +1,24 @@
 import { useBoardStore } from "@/stores/useBoardStore";
 import { useAuth } from "@/contexts/AuthContext";
 import type { Task } from "@/types/board.types";
+import { Calendar, Clock } from "lucide-react";
 
 interface Props {
   task: Task;
   onClick?: (e: React.MouseEvent) => void;
 }
+
+const getDateStatus = (date: string | null | undefined): "overdue" | "today" | "upcoming" | null => {
+  if (!date) return null;
+  const taskDate = new Date(date);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  taskDate.setHours(0, 0, 0, 0);
+  
+  if (taskDate < today) return "overdue";
+  if (taskDate.getTime() === today.getTime()) return "today";
+  return "upcoming";
+};
 
 export const TaskCard = ({ task, onClick }: Props) => {
   const { currentUserRole } = useBoardStore();
@@ -16,9 +29,12 @@ export const TaskCard = ({ task, onClick }: Props) => {
     ? task.assignees.some((a) => a.user.id === user.id)
     : false;
 
+  const endDateStatus = getDateStatus(task.endDate);
+  const startDateStatus = getDateStatus(task.startDate);
+
   return (
     <div
-      className="group bg-kanban-card border border-border rounded-md p-3 shadow-sm hover:shadow-md hover:border-primary/30 transition-all duration-150 cursor-pointer"
+      className="group bg-kanban-card border border-border/60 rounded-md p-3 shadow-sm hover:shadow-lg hover:border-primary/40 transition-all duration-300 cursor-pointer hover:scale-[1.01] active:scale-[0.99] hover:-translate-y-0.5"
       onClick={onClick}
     >
       {/* Labels */}
@@ -47,6 +63,43 @@ export const TaskCard = ({ task, onClick }: Props) => {
         <p className="text-xs text-muted-foreground mt-1.5 line-clamp-2">
           {task.description}
         </p>
+      )}
+
+      {/* Date Display */}
+      {(task.startDate || task.endDate) && (
+        <div className="mt-2.5 flex items-center gap-2 flex-wrap">
+          {task.startDate && (
+            <div
+              className={`flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-medium border ${
+                startDateStatus === "overdue"
+                  ? "bg-destructive/10 text-destructive border-destructive/20"
+                  : startDateStatus === "today"
+                  ? "bg-warning/10 text-warning border-warning/20"
+                  : "bg-primary/10 text-primary border-primary/20"
+              }`}
+            >
+              <Calendar className="h-3 w-3" />
+              <span>{new Date(task.startDate).toLocaleDateString("en-US", { month: "short", day: "numeric" })}</span>
+            </div>
+          )}
+          {task.endDate && (
+            <div
+              className={`flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-medium border ${
+                endDateStatus === "overdue"
+                  ? "bg-destructive/10 text-destructive border-destructive/20"
+                  : endDateStatus === "today"
+                  ? "bg-warning/10 text-warning border-warning/20"
+                  : "bg-primary/10 text-primary border-primary/20"
+              }`}
+            >
+              <Clock className="h-3 w-3" />
+              <span>{new Date(task.endDate).toLocaleDateString("en-US", { month: "short", day: "numeric" })}</span>
+              {endDateStatus === "overdue" && (
+                <span className="ml-0.5 text-[9px]">⚠</span>
+              )}
+            </div>
+          )}
+        </div>
       )}
 
       {/* Footer */}

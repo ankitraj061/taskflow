@@ -26,6 +26,7 @@ const Dashboard = () => {
   } = useBoardsStore();
 
   const [showCreate, setShowCreate] = useState(false);
+  const [deletingBoardId, setDeletingBoardId] = useState<string | null>(null);
   const { user } = useAuth();
   const { socket, isConnected } = useSocket();
 
@@ -48,10 +49,10 @@ const Dashboard = () => {
     <AppLayout>
       <div className="p-4 md:p-8 max-w-5xl mx-auto animate-fade-in">
         {/* Header */}
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center justify-between mb-8">
           <div>
-            <h1 className="text-2xl font-bold text-foreground">Boards</h1>
-            <p className="text-sm text-muted-foreground mt-0.5">
+            <h1 className="text-3xl font-bold text-foreground mb-1">Boards</h1>
+            <p className="text-sm text-muted-foreground">
               Manage your project boards
               {isConnected && (
                 <span className="ml-2 inline-flex items-center">
@@ -61,20 +62,24 @@ const Dashboard = () => {
               )}
             </p>
           </div>
-          <Button onClick={() => setShowCreate(true)} size="sm" className="gap-1.5">
+          <Button 
+            onClick={() => setShowCreate(true)} 
+            size="sm" 
+            className="gap-1.5 transition-all duration-200 hover:scale-105 active:scale-95"
+          >
             <Plus className="h-4 w-4" />
             New Board
           </Button>
         </div>
 
         {/* Search */}
-        <div className="relative mb-6">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <div className="relative mb-8">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground transition-colors z-10" />
           <Input
             placeholder="Search boards..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-9 h-9 bg-card"
+            className="pl-9 h-10 bg-card border-border/60 transition-all duration-200 focus:ring-2 focus:ring-primary/30 focus:border-primary/50 shadow-sm"
           />
         </div>
 
@@ -86,14 +91,14 @@ const Dashboard = () => {
             ))}
           </div>
         ) : boards.length === 0 ? (
-          <div className="text-center py-16">
-            <div className="mx-auto w-24 h-24 mb-4 rounded-full bg-muted flex items-center justify-center">
-              <Plus className="h-10 w-10 text-muted-foreground" />
+          <div className="text-center py-20">
+            <div className="mx-auto w-28 h-28 mb-6 rounded-full bg-gradient-to-br from-primary/10 to-primary/5 flex items-center justify-center border border-primary/20">
+              <Plus className="h-14 w-14 text-primary/60" />
             </div>
-            <h3 className="text-lg font-semibold mb-2">
+            <h3 className="text-xl font-semibold mb-2 text-foreground">
               {searchQuery ? "No boards match your search" : "No boards yet"}
             </h3>
-            <p className="text-muted-foreground mb-4">
+            <p className="text-muted-foreground mb-6 text-sm">
               {searchQuery
                 ? "Try adjusting your search terms"
                 : "Create your first board to get started"}
@@ -101,8 +106,9 @@ const Dashboard = () => {
             {!searchQuery && (
               <Button
                 variant="default"
-                size="sm"
+                size="default"
                 onClick={() => setShowCreate(true)}
+                className="shadow-md hover:shadow-lg transition-all duration-200"
               >
                 <Plus className="h-4 w-4 mr-2" />
                 Create Board
@@ -118,7 +124,15 @@ const Dashboard = () => {
                   key={board.id}
                   board={board}
                   index={i}
-                  onDelete={deleteBoard}
+                  isDeleting={deletingBoardId === board.id}
+                  onDelete={async (boardId) => {
+                    setDeletingBoardId(boardId);
+                    try {
+                      await deleteBoard(boardId);
+                    } finally {
+                      setDeletingBoardId(null);
+                    }
+                  }}
                 />
               ))}
             </div>

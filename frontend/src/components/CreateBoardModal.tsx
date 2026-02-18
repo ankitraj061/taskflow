@@ -58,7 +58,7 @@ export const CreateBoardModal = ({ open, onClose }: Props) => {
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && handleClose()}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md shadow-2xl border-border/50">
         <DialogHeader>
           <DialogTitle>Create New Board</DialogTitle>
         </DialogHeader>

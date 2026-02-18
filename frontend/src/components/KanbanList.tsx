@@ -5,7 +5,7 @@ import { useBoardStore } from "@/stores/useBoardStore";
 import { SortableTaskCard } from "@/components/SortableTaskCard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, MoreHorizontal, Trash2, Edit2 } from "lucide-react";
+import { Plus, MoreHorizontal, Trash2, Edit2, Loader2 } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -27,6 +27,9 @@ export const KanbanList = ({ list, boardId, isAdmin = true, onTaskClick }: Props
   const [newTaskTitle, setNewTaskTitle] = useState("");
   const [isEditing, setIsEditing] = useState(false);
   const [editTitle, setEditTitle] = useState(list.title);
+  const [isAddingTask, setIsAddingTask] = useState(false);
+  const [isUpdatingList, setIsUpdatingList] = useState(false);
+  const [isDeletingList, setIsDeletingList] = useState(false);
   
   const { addTask, updateList, deleteList } = useBoardStore();
 
@@ -34,6 +37,7 @@ export const KanbanList = ({ list, boardId, isAdmin = true, onTaskClick }: Props
 
   const handleAddTask = async () => {
     if (!newTaskTitle.trim()) return;
+    setIsAddingTask(true);
     try {
       await addTask(list.id, boardId, newTaskTitle.trim());
       setNewTaskTitle("");
@@ -42,6 +46,8 @@ export const KanbanList = ({ list, boardId, isAdmin = true, onTaskClick }: Props
     } catch (error: Error | unknown) {
       const message = error instanceof Error ? error.message : "Failed to create task";
       toast.error(message);
+    } finally {
+      setIsAddingTask(false);
     }
   };
 
@@ -51,6 +57,7 @@ export const KanbanList = ({ list, boardId, isAdmin = true, onTaskClick }: Props
       setEditTitle(list.title);
       return;
     }
+    setIsUpdatingList(true);
     try {
       await updateList(boardId, list.id, editTitle.trim());
       setIsEditing(false);
@@ -59,50 +66,61 @@ export const KanbanList = ({ list, boardId, isAdmin = true, onTaskClick }: Props
       const message = error instanceof Error ? error.message : "Failed to update list";
       toast.error(message);
       setEditTitle(list.title);
+    } finally {
+      setIsUpdatingList(false);
     }
   };
 
   const handleDeleteList = async () => {
     if (!confirm(`Delete "${list.title}" and all its tasks?`)) return;
+    setIsDeletingList(true);
     try {
       await deleteList(boardId, list.id);
       toast.success("List deleted");
     } catch (error: Error | unknown) {
       const message = error instanceof Error ? error.message : "Failed to delete list";
       toast.error(message);
+    } finally {
+      setIsDeletingList(false);
     }
   };
 
   return (
     <div
       ref={setNodeRef}
-      className={`w-72 shrink-0 bg-kanban-list rounded-lg flex flex-col max-h-[calc(100vh-10rem)] transition-colors ${
-        isOver ? "ring-2 ring-primary/30" : ""
+      className={`w-72 shrink-0 bg-kanban-list/80 backdrop-blur-sm rounded-lg flex flex-col max-h-[calc(100vh-10rem)] transition-all duration-300 shadow-sm border border-border/50 ${
+        isOver ? "ring-2 ring-primary/50 ring-offset-2 scale-[1.02] shadow-lg" : "hover:shadow-md hover:border-primary/20"
       }`}
     >
       {/* List Header */}
-      <div className="flex items-center justify-between px-3 py-2.5">
+      <div className="flex items-center justify-between px-3 py-3 border-b border-border/30">
         {isEditing ? (
-          <Input
-            value={editTitle}
-            onChange={(e) => setEditTitle(e.target.value)}
-            onBlur={handleUpdateList}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") handleUpdateList();
-              if (e.key === "Escape") {
-                setIsEditing(false);
-                setEditTitle(list.title);
-              }
-            }}
-            autoFocus
-            className="h-7 text-xs font-semibold uppercase"
-          />
+          <div className="flex items-center gap-2 flex-1">
+            <Input
+              value={editTitle}
+              onChange={(e) => setEditTitle(e.target.value)}
+              onBlur={handleUpdateList}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") handleUpdateList();
+                if (e.key === "Escape") {
+                  setIsEditing(false);
+                  setEditTitle(list.title);
+                }
+              }}
+              autoFocus
+              className="h-7 text-xs font-semibold uppercase"
+              disabled={isUpdatingList}
+            />
+            {isUpdatingList && (
+              <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
+            )}
+          </div>
         ) : (
           <div className="flex items-center gap-2">
-            <h3 className="text-xs font-semibold text-foreground uppercase tracking-wider">
+            <h3 className="text-xs font-bold text-foreground uppercase tracking-wider">
               {list.title}
             </h3>
-            <span className="text-xs text-muted-foreground bg-muted rounded-full px-1.5 py-0.5 font-mono">
+            <span className="text-xs text-muted-foreground bg-primary/10 text-primary rounded-full px-2 py-0.5 font-semibold min-w-[20px] text-center">
               {list.tasks.length}
             </span>
           </div>
@@ -126,9 +144,19 @@ export const KanbanList = ({ list, boardId, isAdmin = true, onTaskClick }: Props
               <DropdownMenuItem
                 onClick={handleDeleteList}
                 className="text-destructive focus:text-destructive"
+                disabled={isDeletingList}
               >
-                <Trash2 className="h-3.5 w-3.5 mr-2" />
-                Delete list
+                {isDeletingList ? (
+                  <>
+                    <Loader2 className="h-3.5 w-3.5 mr-2 animate-spin" />
+                    Deleting...
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="h-3.5 w-3.5 mr-2" />
+                    Delete list
+                  </>
+                )}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -153,30 +181,40 @@ export const KanbanList = ({ list, boardId, isAdmin = true, onTaskClick }: Props
         {/* Add Task Inline */}
         {showAddTask ? (
           <div className="animate-scale-in">
-            <Input
-              value={newTaskTitle}
-              onChange={(e) => setNewTaskTitle(e.target.value)}
-              placeholder="Task title..."
-              autoFocus
-              className="h-8 text-sm bg-card"
-              onKeyDown={(e) => {
-                if (e.key === "Enter") handleAddTask();
-                if (e.key === "Escape") setShowAddTask(false);
-              }}
-            />
+              <Input
+                value={newTaskTitle}
+                onChange={(e) => setNewTaskTitle(e.target.value)}
+                placeholder="Task title..."
+                autoFocus
+                className="h-8 text-sm bg-card"
+                disabled={isAddingTask}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !isAddingTask) handleAddTask();
+                  if (e.key === "Escape") setShowAddTask(false);
+                }}
+              />
             <div className="flex gap-2 mt-1.5">
               <Button
                 size="sm"
                 className="h-6 text-xs px-2"
                 onClick={handleAddTask}
+                disabled={isAddingTask}
               >
-                Add
+                {isAddingTask ? (
+                  <>
+                    <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                    Adding...
+                  </>
+                ) : (
+                  "Add"
+                )}
               </Button>
               <Button
                 size="sm"
                 variant="ghost"
                 className="h-6 text-xs px-2"
                 onClick={() => setShowAddTask(false)}
+                disabled={isAddingTask}
               >
                 Cancel
               </Button>

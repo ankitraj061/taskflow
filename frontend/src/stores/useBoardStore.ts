@@ -33,7 +33,14 @@ interface BoardState {
 
   // Task actions
   addTask: (listId: string, boardId: string, title: string, description?: string) => Promise<void>;
-  updateTask: (boardId: string, taskId: string, title: string, description?: string) => Promise<void>;
+  updateTask: (
+    boardId: string,
+    taskId: string,
+    title: string,
+    description?: string,
+    startDate?: string | null,
+    endDate?: string | null
+  ) => Promise<void>;
   deleteTask: (boardId: string, taskId: string) => Promise<void>;
   moveTask: (boardId: string, taskId: string, sourceListId: string, destinationListId: string, position: number) => Promise<void>;
   
@@ -229,10 +236,34 @@ export const useBoardStore = create<BoardState>((set, get) => ({
     }
   },
 
-  updateTask: async (boardId: string, taskId: string, title: string, description?: string) => {
+  updateTask: async (
+    boardId: string,
+    taskId: string,
+    title: string,
+    description?: string,
+    startDate?: string | null,
+    endDate?: string | null
+  ) => {
     try {
-      await axiosClient.put(`/api/boards/${boardId}/tasks/${taskId}`, { title, description });
-      // Socket will handle the update via handleTaskUpdated
+      const response = await axiosClient.put(`/api/boards/${boardId}/tasks/${taskId}`, {
+        title,
+        description,
+        startDate,
+        endDate,
+      });
+      const updatedTask = response.data as Task;
+
+      // Update local state immediately (socket will still sync other users)
+      set((state) => ({
+        lists: state.lists.map((list) =>
+          list.id === updatedTask.listId
+            ? {
+                ...list,
+                tasks: list.tasks.map((t) => (t.id === updatedTask.id ? updatedTask : t)),
+              }
+            : list
+        ),
+      }));
     } catch (error: unknown) {
       console.error("Error updating task:", error);
       const axiosError = error as AxiosError;

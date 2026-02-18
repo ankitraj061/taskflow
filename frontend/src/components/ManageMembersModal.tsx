@@ -11,7 +11,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { UserPlus, Trash2, Shield, Wrench } from "lucide-react";
+import { UserPlus, Trash2, Shield, Wrench, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import type { BoardRole } from "@/types/board.types";
 
@@ -27,6 +27,8 @@ export const ManageMembersModal = ({ boardId, open, onClose }: Props) => {
   const [email, setEmail] = useState("");
   const [role, setRole] = useState<BoardRole>("WORKER");
   const [isAdding, setIsAdding] = useState(false);
+  const [removingMemberId, setRemovingMemberId] = useState<string | null>(null);
+  const [changingRoleMemberId, setChangingRoleMemberId] = useState<string | null>(null);
 
   const isAdmin = currentUserRole === "ADMIN";
   const members = board?.members || [];
@@ -54,20 +56,26 @@ export const ManageMembersModal = ({ boardId, open, onClose }: Props) => {
   };
 
   const handleRemove = async (memberId: string, userName: string) => {
+    setRemovingMemberId(memberId);
     try {
       await removeMember(boardId, memberId);
       toast.success(`Removed ${userName}`);
     } catch (error: unknown) {
       toast.error((error as Error).message || "Failed to remove member");
+    } finally {
+      setRemovingMemberId(null);
     }
   };
 
   const handleRoleChange = async (memberId: string, newRole: BoardRole) => {
+    setChangingRoleMemberId(memberId);
     try {
       await updateMemberRole(boardId, memberId, newRole);
       toast.success("Role updated");
     } catch (error: unknown) {
       toast.error((error as Error).message || "Failed to update role");
+    } finally {
+      setChangingRoleMemberId(null);
     }
   };
 
@@ -76,7 +84,7 @@ export const ManageMembersModal = ({ boardId, open, onClose }: Props) => {
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md shadow-2xl border-border/50">
         <DialogHeader>
           <DialogTitle>Manage Members</DialogTitle>
         </DialogHeader>
@@ -119,8 +127,17 @@ export const ManageMembersModal = ({ boardId, open, onClose }: Props) => {
               onClick={handleAdd}
               disabled={isAdding}
             >
-              <UserPlus className="h-3.5 w-3.5" />
-              Add
+              {isAdding ? (
+                <>
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  Adding...
+                </>
+              ) : (
+                <>
+                  <UserPlus className="h-3.5 w-3.5" />
+                  Add
+                </>
+              )}
             </Button>
           </div>
         )}
@@ -177,9 +194,14 @@ export const ManageMembersModal = ({ boardId, open, onClose }: Props) => {
                   <Select
                     value={m.role}
                     onValueChange={(v) => handleRoleChange(m.id, v as BoardRole)}
+                    disabled={changingRoleMemberId === m.id}
                   >
                     <SelectTrigger className="h-7 w-24 text-xs">
-                      <SelectValue />
+                      {changingRoleMemberId === m.id ? (
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                      ) : (
+                        <SelectValue />
+                      )}
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="ADMIN">Admin</SelectItem>
@@ -196,10 +218,15 @@ export const ManageMembersModal = ({ boardId, open, onClose }: Props) => {
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
+                    className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity disabled:opacity-100"
                     onClick={() => handleRemove(m.id, m.user.name)}
+                    disabled={removingMemberId === m.id}
                   >
-                    <Trash2 className="h-3.5 w-3.5" />
+                    {removingMemberId === m.id ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Trash2 className="h-3.5 w-3.5" />
+                    )}
                   </Button>
                 )}
               </div>

@@ -3,10 +3,29 @@ import { prisma } from "../db/prisma.js";
 import { io } from "../index.js";
 import { createActivity } from "../utils/activity.js";
 
+function parseOptionalDateField(value: unknown): { provided: boolean; date: Date | null } {
+  // Not present in payload
+  if (value === undefined) return { provided: false, date: null };
+
+  // Explicit clear
+  if (value === null) return { provided: true, date: null };
+  if (typeof value === "string" && value.trim() === "") return { provided: true, date: null };
+
+  if (typeof value === "string") {
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) {
+      throw new Error("Invalid date format. Use ISO string or YYYY-MM-DD.");
+    }
+    return { provided: true, date: d };
+  }
+
+  throw new Error("Invalid date value. Use ISO string, YYYY-MM-DD, or null.");
+}
+
 export const createTask = async (req: Request, res: Response) => {
   try {
     const { boardId, listId } = req.params as { boardId: string; listId: string };
-    const { title, description } = req.body;
+    const { title, description, startDate, endDate } = req.body;
 
     if (!title || !title.trim()) {
       return res.status(400).json({ error: "Task title is required" });
@@ -30,12 +49,21 @@ export const createTask = async (req: Request, res: Response) => {
 
     const position = (maxPosition?.position ?? -1) + 1;
 
+    const parsedStart = parseOptionalDateField(startDate);
+    const parsedEnd = parseOptionalDateField(endDate);
+
+    if (parsedStart.date && parsedEnd.date && parsedEnd.date < parsedStart.date) {
+      return res.status(400).json({ error: "End date cannot be before start date" });
+    }
+
     const task = await prisma.task.create({
       data: {
         title: title.trim(),
         description: description?.trim() || null,
         position,
         listId,
+        startDate: parsedStart.date,
+        endDate: parsedEnd.date,
       },
       include: {
         assignees: {
@@ -70,11 +98,39 @@ export const createTask = async (req: Request, res: Response) => {
 export const updateTask = async (req: Request, res: Response) => {
   try {
     const { boardId, taskId } = req.params as { boardId: string; taskId: string };
-    const { title, description } = req.body;
+    const { title, description, startDate, endDate } = req.body;
 
     const updateData: any = {};
-    if (title !== undefined) updateData.title = title.trim();
-    if (description !== undefined) updateData.description = description?.trim() || null;
+    if (title !== undefined) updateData.title = typeof title === "string" ? title.trim() : title;
+    if (description !== undefined)
+      updateData.description = typeof description === "string" ? description.trim() || null : description;
+
+    const startProvided = startDate !== undefined;
+    const endProvided = endDate !== undefined;
+
+    if (startProvided || endProvided) {
+      const existing = await prisma.task.findUnique({
+        where: { id: taskId },
+        select: { startDate: true, endDate: true, title: true },
+      });
+
+      if (!existing) {
+        return res.status(404).json({ error: "Task not found" });
+      }
+
+      const parsedStart = parseOptionalDateField(startDate);
+      const parsedEnd = parseOptionalDateField(endDate);
+
+      const nextStart = parsedStart.provided ? parsedStart.date : existing.startDate;
+      const nextEnd = parsedEnd.provided ? parsedEnd.date : existing.endDate;
+
+      if (nextStart && nextEnd && nextEnd < nextStart) {
+        return res.status(400).json({ error: "End date cannot be before start date" });
+      }
+
+      if (parsedStart.provided) updateData.startDate = parsedStart.date;
+      if (parsedEnd.provided) updateData.endDate = parsedEnd.date;
+    }
 
     const task = await prisma.task.update({
       where: { id: taskId },

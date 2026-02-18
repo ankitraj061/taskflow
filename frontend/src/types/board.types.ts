@@ -36,6 +36,8 @@ export interface Task {
   position: number;
   listId: string;
   boardId?: string;
+  startDate?: string | null;
+  endDate?: string | null;
   createdAt: string;
   updatedAt: string;
   assignees: TaskAssignee[];

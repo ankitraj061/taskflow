@@ -31,6 +31,9 @@ import {
   Calendar,
   AlignLeft,
   Save,
+  Loader2,
+  Clock,
+  AlertCircle,
 } from "lucide-react";
 import { toast } from "sonner";
 import type { Task, Label } from "@/types/board.types";
@@ -67,8 +70,15 @@ export const TaskDetailModal = ({ task, open, onClose }: Props) => {
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
+  const [startDate, setStartDate] = useState<string>(""); // YYYY-MM-DD
+  const [endDate, setEndDate] = useState<string>(""); // YYYY-MM-DD
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [isAddingLabel, setIsAddingLabel] = useState(false);
+  const [removingLabelId, setRemovingLabelId] = useState<string | null>(null);
+  const [assigningUserId, setAssigningUserId] = useState<string | null>(null);
+  const [unassigningUserId, setUnassigningUserId] = useState<string | null>(null);
 
   // Label state
   const [showLabelPopover, setShowLabelPopover] = useState(false);
@@ -78,14 +88,41 @@ export const TaskDetailModal = ({ task, open, onClose }: Props) => {
   // Assignee state
   const [showAssignPopover, setShowAssignPopover] = useState(false);
 
+  const getDateStatus = (date: string | null | undefined): "overdue" | "today" | "upcoming" | null => {
+    if (!date) return null;
+    const taskDate = new Date(date);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    taskDate.setHours(0, 0, 0, 0);
+    
+    if (taskDate < today) return "overdue";
+    if (taskDate.getTime() === today.getTime()) return "today";
+    return "upcoming";
+  };
+
+  const formatDateDisplay = (date: string | null | undefined): string => {
+    if (!date) return "";
+    return new Date(date).toLocaleDateString("en-US", {
+      weekday: "short",
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    });
+  };
+
   useEffect(() => {
     if (task) {
       setTitle(task.title);
       setDescription(task.description || "");
+      setStartDate(task.startDate ? task.startDate.slice(0, 10) : "");
+      setEndDate(task.endDate ? task.endDate.slice(0, 10) : "");
     }
   }, [task]);
 
   if (!task || !boardId) return null;
+
+  const startDateStatus = getDateStatus(task.startDate);
+  const endDateStatus = getDateStatus(task.endDate);
 
   const handleSave = async () => {
     if (!title.trim()) {
@@ -93,9 +130,21 @@ export const TaskDetailModal = ({ task, open, onClose }: Props) => {
       return;
     }
 
+    if (startDate && endDate && endDate < startDate) {
+      toast.error("End date cannot be before start date");
+      return;
+    }
+
     setIsSaving(true);
     try {
-      await updateTask(boardId, task.id, title.trim(), description.trim() || undefined);
+      await updateTask(
+        boardId,
+        task.id,
+        title.trim(),
+        description.trim() || undefined,
+        startDate || null,
+        endDate || null
+      );
       setIsEditing(false);
       toast.success("Task updated");
     } catch (error: unknown) {
@@ -109,6 +158,7 @@ export const TaskDetailModal = ({ task, open, onClose }: Props) => {
   const handleDelete = async () => {
     if (!confirm("Delete this task?")) return;
 
+    setIsDeleting(true);
     try {
       await deleteTask(boardId, task.id);
       onClose();
@@ -116,6 +166,8 @@ export const TaskDetailModal = ({ task, open, onClose }: Props) => {
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : "Failed to delete task";
       toast.error(message);
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -125,6 +177,7 @@ export const TaskDetailModal = ({ task, open, onClose }: Props) => {
       return;
     }
 
+    setIsAddingLabel(true);
     try {
       await addLabel(boardId, task.id, newLabelName.trim(), selectedColor);
       setNewLabelName("");
@@ -133,36 +186,47 @@ export const TaskDetailModal = ({ task, open, onClose }: Props) => {
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : "Failed to add label";
       toast.error(message);
+    } finally {
+      setIsAddingLabel(false);
     }
   };
 
   const handleRemoveLabel = async (labelId: string) => {
+    setRemovingLabelId(labelId);
     try {
       await removeLabel(boardId, task.id, labelId);
       toast.success("Label removed");
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : "Failed to remove label";
       toast.error(message);
+    } finally {
+      setRemovingLabelId(null);
     }
   };
 
   const handleAssignUser = async (userId: string) => {
+    setAssigningUserId(userId);
     try {
       await assignUser(boardId, task.id, userId);
       toast.success("User assigned");
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : "Failed to assign user";
       toast.error(message);
+    } finally {
+      setAssigningUserId(null);
     }
   };
 
   const handleUnassignUser = async (userId: string) => {
+    setUnassigningUserId(userId);
     try {
       await unassignUser(boardId, task.id, userId);
       toast.success("User unassigned");
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : "Failed to unassign user";
       toast.error(message);
+    } finally {
+      setUnassigningUserId(null);
     }
   };
 
@@ -176,7 +240,7 @@ export const TaskDetailModal = ({ task, open, onClose }: Props) => {
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto shadow-xl border-border/50">
         <DialogHeader>
           <div className="flex items-start justify-between">
             <div className="flex-1">
@@ -184,9 +248,10 @@ export const TaskDetailModal = ({ task, open, onClose }: Props) => {
                 <Input
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
-                  className="text-lg font-semibold mb-2"
+                  className="text-lg font-semibold mb-2 transition-all duration-200 focus:ring-2 focus:ring-primary/20"
                   placeholder="Task title"
                   autoFocus
+                  disabled={isSaving}
                 />
               ) : (
                 <DialogTitle
@@ -200,17 +265,17 @@ export const TaskDetailModal = ({ task, open, onClose }: Props) => {
           </div>
         </DialogHeader>
 
-        <div className="space-y-4">
+        <div className="space-y-6">
           {/* Labels Section */}
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="text-sm font-semibold flex items-center gap-2">
-                <Tag className="h-4 w-4" />
+          <div className="pb-4 border-b border-border/50">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-semibold flex items-center gap-2 text-foreground">
+                <Tag className="h-4 w-4 text-primary" />
                 Labels
               </h3>
               <Popover open={showLabelPopover} onOpenChange={setShowLabelPopover}>
                 <PopoverTrigger asChild>
-                  <Button variant="outline" size="sm" className="h-7 text-xs">
+                  <Button variant="outline" size="sm" className="h-7 text-xs shadow-sm hover:shadow-md">
                     <Tag className="h-3 w-3 mr-1" />
                     Add Label
                   </Button>
@@ -247,8 +312,16 @@ export const TaskDetailModal = ({ task, open, onClose }: Props) => {
                       onClick={handleAddLabel}
                       className="w-full"
                       size="sm"
+                      disabled={isAddingLabel}
                     >
-                      Create
+                      {isAddingLabel ? (
+                        <>
+                          <Loader2 className="h-3.5 w-3.5 mr-2 animate-spin" />
+                          Creating...
+                        </>
+                      ) : (
+                        "Create"
+                      )}
                     </Button>
                   </div>
                 </PopoverContent>
@@ -272,9 +345,14 @@ export const TaskDetailModal = ({ task, open, onClose }: Props) => {
                     {label.name}
                     <button
                       onClick={() => handleRemoveLabel(label.id)}
-                      className="ml-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                      disabled={removingLabelId === label.id}
+                      className="ml-1 opacity-0 group-hover:opacity-100 transition-opacity disabled:opacity-100"
                     >
-                      <X className="h-3 w-3" />
+                      {removingLabelId === label.id ? (
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                      ) : (
+                        <X className="h-3 w-3" />
+                      )}
                     </button>
                   </Badge>
                 ))
@@ -283,15 +361,15 @@ export const TaskDetailModal = ({ task, open, onClose }: Props) => {
           </div>
 
           {/* Assignees Section */}
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="text-sm font-semibold flex items-center gap-2">
-                <Users className="h-4 w-4" />
+          <div className="pb-4 border-b border-border/50">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-semibold flex items-center gap-2 text-foreground">
+                <Users className="h-4 w-4 text-primary" />
                 Assignees
               </h3>
               <Popover open={showAssignPopover} onOpenChange={setShowAssignPopover}>
                 <PopoverTrigger asChild>
-                  <Button variant="outline" size="sm" className="h-7 text-xs">
+                  <Button variant="outline" size="sm" className="h-7 text-xs shadow-sm hover:shadow-md">
                     <Users className="h-3 w-3 mr-1" />
                     Assign
                   </Button>
@@ -320,8 +398,13 @@ export const TaskDetailModal = ({ task, open, onClose }: Props) => {
                             size="sm"
                             className="h-6 text-xs"
                             onClick={() => handleUnassignUser(board.owner.id)}
+                            disabled={unassigningUserId === board.owner.id}
                           >
-                            Remove
+                            {unassigningUserId === board.owner.id ? (
+                              <Loader2 className="h-3 w-3 animate-spin" />
+                            ) : (
+                              "Remove"
+                            )}
                           </Button>
                         ) : (
                           <Button
@@ -329,8 +412,13 @@ export const TaskDetailModal = ({ task, open, onClose }: Props) => {
                             size="sm"
                             className="h-6 text-xs"
                             onClick={() => handleAssignUser(board.owner.id)}
+                            disabled={assigningUserId === board.owner.id}
                           >
-                            Assign
+                            {assigningUserId === board.owner.id ? (
+                              <Loader2 className="h-3 w-3 animate-spin" />
+                            ) : (
+                              "Assign"
+                            )}
                           </Button>
                         )}
                       </div>
@@ -361,8 +449,13 @@ export const TaskDetailModal = ({ task, open, onClose }: Props) => {
                             size="sm"
                             className="h-6 text-xs"
                             onClick={() => handleUnassignUser(member.userId)}
+                            disabled={unassigningUserId === member.userId}
                           >
-                            Remove
+                            {unassigningUserId === member.userId ? (
+                              <Loader2 className="h-3 w-3 animate-spin" />
+                            ) : (
+                              "Remove"
+                            )}
                           </Button>
                         ) : (
                           <Button
@@ -370,8 +463,13 @@ export const TaskDetailModal = ({ task, open, onClose }: Props) => {
                             size="sm"
                             className="h-6 text-xs"
                             onClick={() => handleAssignUser(member.userId)}
+                            disabled={assigningUserId === member.userId}
                           >
-                            Assign
+                            {assigningUserId === member.userId ? (
+                              <Loader2 className="h-3 w-3 animate-spin" />
+                            ) : (
+                              "Assign"
+                            )}
                           </Button>
                         )}
                       </div>
@@ -395,9 +493,14 @@ export const TaskDetailModal = ({ task, open, onClose }: Props) => {
                     <span className="text-xs">{assignee.user.name}</span>
                     <button
                       onClick={() => handleUnassignUser(assignee.user.id)}
-                      className="opacity-0 group-hover:opacity-100 transition-opacity"
+                      disabled={unassigningUserId === assignee.user.id}
+                      className="opacity-0 group-hover:opacity-100 transition-opacity disabled:opacity-100"
                     >
-                      <X className="h-3 w-3" />
+                      {unassigningUserId === assignee.user.id ? (
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                      ) : (
+                        <X className="h-3 w-3" />
+                      )}
                     </button>
                   </div>
                 ))
@@ -405,10 +508,195 @@ export const TaskDetailModal = ({ task, open, onClose }: Props) => {
             </div>
           </div>
 
+          {/* Schedule */}
+          <div className="pb-4 border-b border-border/50">
+            <h3 className="text-sm font-semibold mb-3 flex items-center gap-2 text-foreground">
+              <Calendar className="h-4 w-4 text-primary" />
+              Schedule
+            </h3>
+
+            {isEditing ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-medium text-foreground flex items-center gap-1.5">
+                      <Calendar className="h-3 w-3 text-primary" />
+                      Start date
+                    </label>
+                    {startDate && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 text-[10px] px-2"
+                        onClick={() => setStartDate("")}
+                        disabled={isSaving}
+                      >
+                        Clear
+                      </Button>
+                    )}
+                  </div>
+                  <Input
+                    type="date"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                    className="h-10 text-sm bg-card transition-all duration-200 focus:ring-2 focus:ring-primary/30 border-border/60"
+                    disabled={isSaving}
+                  />
+                  {startDate && (
+                    <p className="text-[10px] text-muted-foreground">
+                      {formatDateDisplay(startDate)}
+                    </p>
+                  )}
+                </div>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-medium text-foreground flex items-center gap-1.5">
+                      <Clock className="h-3 w-3 text-primary" />
+                      End date
+                    </label>
+                    {endDate && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 text-[10px] px-2"
+                        onClick={() => setEndDate("")}
+                        disabled={isSaving}
+                      >
+                        Clear
+                      </Button>
+                    )}
+                  </div>
+                  <Input
+                    type="date"
+                    value={endDate}
+                    onChange={(e) => setEndDate(e.target.value)}
+                    className="h-10 text-sm bg-card transition-all duration-200 focus:ring-2 focus:ring-primary/30 border-border/60"
+                    disabled={isSaving}
+                    min={startDate || undefined}
+                  />
+                  {endDate && (
+                    <p className="text-[10px] text-muted-foreground">
+                      {formatDateDisplay(endDate)}
+                    </p>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {/* Start Date */}
+                <div className="flex items-start gap-3">
+                  <div className="mt-0.5">
+                    <Calendar className="h-4 w-4 text-primary" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-xs font-medium text-muted-foreground mb-1">Start Date</p>
+                    {task.startDate ? (
+                      <div className="flex items-center gap-2">
+                        <div
+                          className={`px-3 py-2 rounded-lg border flex items-center gap-2 ${
+                            startDateStatus === "overdue"
+                              ? "bg-destructive/10 text-destructive border-destructive/30"
+                              : startDateStatus === "today"
+                              ? "bg-warning/10 text-warning border-warning/30"
+                              : "bg-primary/10 text-primary border-primary/30"
+                          }`}
+                        >
+                          {startDateStatus === "overdue" && (
+                            <AlertCircle className="h-3.5 w-3.5" />
+                          )}
+                          <span className="text-sm font-medium">
+                            {formatDateDisplay(task.startDate)}
+                          </span>
+                        </div>
+                        {startDateStatus === "overdue" && (
+                          <span className="text-[10px] text-destructive font-medium">Overdue</span>
+                        )}
+                        {startDateStatus === "today" && (
+                          <span className="text-[10px] text-warning font-medium">Today</span>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="px-3 py-2 rounded-lg border border-border/50 bg-muted/30">
+                        <span className="text-sm text-muted-foreground">No start date set</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* End Date */}
+                <div className="flex items-start gap-3">
+                  <div className="mt-0.5">
+                    <Clock className="h-4 w-4 text-primary" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-xs font-medium text-muted-foreground mb-1">End Date</p>
+                    {task.endDate ? (
+                      <div className="flex items-center gap-2">
+                        <div
+                          className={`px-3 py-2 rounded-lg border flex items-center gap-2 ${
+                            endDateStatus === "overdue"
+                              ? "bg-destructive/10 text-destructive border-destructive/30"
+                              : endDateStatus === "today"
+                              ? "bg-warning/10 text-warning border-warning/30"
+                              : "bg-primary/10 text-primary border-primary/30"
+                          }`}
+                        >
+                          {endDateStatus === "overdue" && (
+                            <AlertCircle className="h-3.5 w-3.5" />
+                          )}
+                          <span className="text-sm font-medium">
+                            {formatDateDisplay(task.endDate)}
+                          </span>
+                        </div>
+                        {endDateStatus === "overdue" && (
+                          <span className="text-[10px] text-destructive font-medium">Overdue</span>
+                        )}
+                        {endDateStatus === "today" && (
+                          <span className="text-[10px] text-warning font-medium">Due Today</span>
+                        )}
+                        {endDateStatus === "upcoming" && task.startDate && (
+                          <span className="text-[10px] text-muted-foreground">
+                            {Math.ceil(
+                              (new Date(task.endDate).getTime() - new Date().getTime()) /
+                                (1000 * 60 * 60 * 24)
+                            )}{" "}
+                            days left
+                          </span>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="px-3 py-2 rounded-lg border border-border/50 bg-muted/30">
+                        <span className="text-sm text-muted-foreground">No end date set</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Date Range Summary */}
+                {task.startDate && task.endDate && (
+                  <div className="mt-2 pt-2 border-t border-border/30">
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <span>
+                        Duration:{" "}
+                        {Math.ceil(
+                          (new Date(task.endDate).getTime() - new Date(task.startDate).getTime()) /
+                            (1000 * 60 * 60 * 24)
+                        )}{" "}
+                        days
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
           {/* Description Section */}
-          <div>
-            <h3 className="text-sm font-semibold mb-2 flex items-center gap-2">
-              <AlignLeft className="h-4 w-4" />
+          <div className="pb-4 border-b border-border/50">
+            <h3 className="text-sm font-semibold mb-3 flex items-center gap-2 text-foreground">
+              <AlignLeft className="h-4 w-4 text-primary" />
               Description
             </h3>
             {isEditing ? (
@@ -417,7 +705,8 @@ export const TaskDetailModal = ({ task, open, onClose }: Props) => {
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="Add a more detailed description..."
                 rows={4}
-                className="text-sm"
+                className="text-sm transition-all duration-200 focus:ring-2 focus:ring-primary/20"
+                disabled={isSaving}
               />
             ) : (
               <div
@@ -430,7 +719,7 @@ export const TaskDetailModal = ({ task, open, onClose }: Props) => {
           </div>
 
           {/* Metadata */}
-          <div className="text-xs text-muted-foreground space-y-1 pt-2 border-t">
+          <div className="text-xs text-muted-foreground space-y-1 pt-4 border-t border-border/50">
             <div className="flex items-center gap-2">
               <Calendar className="h-3 w-3" />
               Created {new Date(task.createdAt).toLocaleDateString()}
@@ -444,12 +733,21 @@ export const TaskDetailModal = ({ task, open, onClose }: Props) => {
           </div>
 
           {/* Actions */}
-          <div className="flex items-center justify-between pt-2 border-t">
+          <div className="flex items-center justify-between pt-4 border-t border-border/50">
             {isEditing ? (
               <div className="flex gap-2">
                 <Button onClick={handleSave} disabled={isSaving} size="sm">
-                  <Save className="h-3.5 w-3.5 mr-1" />
-                  Save Changes
+                  {isSaving ? (
+                    <>
+                      <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="h-3.5 w-3.5 mr-1" />
+                      Save Changes
+                    </>
+                  )}
                 </Button>
                 <Button
                   variant="outline"
@@ -457,8 +755,11 @@ export const TaskDetailModal = ({ task, open, onClose }: Props) => {
                     setIsEditing(false);
                     setTitle(task.title);
                     setDescription(task.description || "");
+                    setStartDate(task.startDate ? task.startDate.slice(0, 10) : "");
+                    setEndDate(task.endDate ? task.endDate.slice(0, 10) : "");
                   }}
                   size="sm"
+                  disabled={isSaving}
                 >
                   Cancel
                 </Button>
@@ -468,6 +769,7 @@ export const TaskDetailModal = ({ task, open, onClose }: Props) => {
                 variant="outline"
                 onClick={() => setIsEditing(true)}
                 size="sm"
+                className="shadow-sm hover:shadow-md"
               >
                 Edit Task
               </Button>
@@ -477,9 +779,19 @@ export const TaskDetailModal = ({ task, open, onClose }: Props) => {
               onClick={handleDelete}
               size="sm"
               className="gap-1.5"
+              disabled={isDeleting}
             >
-              <Trash2 className="h-3.5 w-3.5" />
-              Delete
+              {isDeleting ? (
+                <>
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                <>
+                  <Trash2 className="h-3.5 w-3.5" />
+                  Delete
+                </>
+              )}
             </Button>
           </div>
         </div>

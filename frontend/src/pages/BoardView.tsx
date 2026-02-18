@@ -24,7 +24,7 @@ import { ManageMembersModal } from "@/components/ManageMembersModal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Plus, Activity, ArrowLeft, Users } from "lucide-react";
+import { Plus, Activity, ArrowLeft, Users, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import type { Task } from "@/types/board.types";
 
@@ -53,6 +53,9 @@ const BoardView = () => {
   const [showAddList, setShowAddList] = useState(false);
   const [activeTask, setActiveTask] = useState<Task | null>(null);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const [isAddingList, setIsAddingList] = useState(false);
+  const [isLoadingActivities, setIsLoadingActivities] = useState(false);
+  const [isMovingTask, setIsMovingTask] = useState(false);
 
   const handleTaskClick = (task: Task) => {
   setSelectedTask(task);
@@ -106,6 +109,7 @@ useEffect(() => {
 
   const handleAddList = async () => {
     if (!newListTitle.trim() || !boardId) return;
+    setIsAddingList(true);
     try {
       await addList(boardId, newListTitle.trim());
       setNewListTitle("");
@@ -114,6 +118,8 @@ useEffect(() => {
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : "Failed to create list";
       toast.error(message);
+    } finally {
+      setIsAddingList(false);
     }
   };
 
@@ -157,11 +163,14 @@ useEffect(() => {
       newPosition = toList?.tasks.findIndex((t) => t.id === overTask.id) ?? 0;
     }
 
+    setIsMovingTask(true);
     try {
       await moveTask(boardId, taskId, task.listId, toListId, newPosition);
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : "Failed to move task";
       toast.error(message);
+    } finally {
+      setIsMovingTask(false);
     }
   };
 
@@ -184,7 +193,7 @@ useEffect(() => {
       <div className="flex h-[calc(100vh-3.5rem)]">
         <div className="flex-1 flex flex-col overflow-hidden">
           {/* Board Header */}
-          <div className="flex items-center justify-between px-4 md:px-6 py-3 border-b border-border shrink-0 bg-card/50">
+          <div className="flex items-center justify-between px-4 md:px-6 py-3 border-b border-border shrink-0 bg-card/80 backdrop-blur-sm shadow-sm">
             <div className="flex items-center gap-3">
               <Button
                 variant="ghost"
@@ -195,11 +204,11 @@ useEffect(() => {
                 <ArrowLeft className="h-3.5 w-3.5" />
               </Button>
               <div>
-                <h1 className="text-base font-semibold text-foreground">
+                <h1 className="text-lg font-bold text-foreground">
                   {board?.title || "Board"}
                 </h1>
                 {board?.description && (
-                  <p className="text-xs text-muted-foreground">{board.description}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">{board.description}</p>
                 )}
               </div>
             </div>
@@ -207,7 +216,7 @@ useEffect(() => {
               <Button
                 variant="outline"
                 size="sm"
-                className="gap-1.5 h-7"
+                className="gap-1.5 h-7 transition-all duration-200 hover:scale-105 active:scale-95"
                 onClick={() => setShowMembers(true)}
               >
                 <Users className="h-3.5 w-3.5" />
@@ -219,11 +228,17 @@ useEffect(() => {
               <Button
                 variant="outline"
                 size="sm"
-                className="gap-1.5 h-7"
-                onClick={() => {
-                  setShowActivity(!showActivity);
-                  if (!showActivity && boardId) {
-                    fetchActivities(boardId);
+                className="gap-1.5 h-7 transition-all duration-200 hover:scale-105 active:scale-95"
+                onClick={async () => {
+                  const newState = !showActivity;
+                  setShowActivity(newState);
+                  if (newState && boardId) {
+                    setIsLoadingActivities(true);
+                    try {
+                      await fetchActivities(boardId);
+                    } finally {
+                      setIsLoadingActivities(false);
+                    }
                   }
                 }}
               >
@@ -241,7 +256,7 @@ useEffect(() => {
             onDragEnd={handleDragEnd}
             onDragOver={handleDragOver}
           >
-            <div className="flex gap-4 p-4 md:p-6 overflow-x-auto flex-1 kanban-scrollbar items-start">
+            <div className="flex gap-4 p-4 md:p-6 overflow-x-auto flex-1 kanban-scrollbar items-start bg-gradient-to-b from-background/50 to-background">
               {lists.map((list) => (
   <KanbanList
     key={list.id}
@@ -262,8 +277,9 @@ useEffect(() => {
                       onChange={(e) => setNewListTitle(e.target.value)}
                       placeholder="List title..."
                       autoFocus
+                      disabled={isAddingList}
                       onKeyDown={(e) => {
-                        if (e.key === "Enter") handleAddList();
+                        if (e.key === "Enter" && !isAddingList) handleAddList();
                         if (e.key === "Escape") setShowAddList(false);
                       }}
                       className="h-8 text-sm bg-card"
@@ -273,14 +289,23 @@ useEffect(() => {
                         size="sm"
                         className="h-7 text-xs"
                         onClick={handleAddList}
+                        disabled={isAddingList}
                       >
-                        Add
+                        {isAddingList ? (
+                          <>
+                            <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                            Adding...
+                          </>
+                        ) : (
+                          "Add"
+                        )}
                       </Button>
                       <Button
                         size="sm"
                         variant="ghost"
                         className="h-7 text-xs"
                         onClick={() => setShowAddList(false)}
+                        disabled={isAddingList}
                       >
                         Cancel
                       </Button>
@@ -308,6 +333,7 @@ useEffect(() => {
         {showActivity && (
           <ActivitySidebar
             activities={activities}
+            isLoading={isLoadingActivities}
             onClose={() => setShowActivity(false)}
           />
         )}
