@@ -101,10 +101,14 @@ export const useBoardsStore = create<BoardsState>((set, get) => ({
       
       const newBoard = response.data;
       
-      // Add optimistically
+      // Add optimistically (guard against duplicate when socket event arrives first)
       set((state) => ({
-        boards: [newBoard, ...state.boards],
-        total: state.total + 1,
+        boards: state.boards.some((b) => b.id === newBoard.id)
+          ? state.boards
+          : [newBoard, ...state.boards],
+        total: state.boards.some((b) => b.id === newBoard.id)
+          ? state.total
+          : state.total + 1,
       }));
 
       return newBoard;
