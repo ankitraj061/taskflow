@@ -5,10 +5,12 @@ import { useBoardsStore } from "@/stores/useBoardsStore";
 import { AppLayout } from "@/layouts/AppLayout";
 import { BoardCard } from "@/components/BoardCard";
 import { CreateBoardModal } from "@/components/CreateBoardModal";
+import { EditBoardModal } from "@/components/EditBoardModal";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Plus, Search } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import type { Board } from "@/types/board.types";
 
 const Dashboard = () => {
   const {
@@ -26,6 +28,7 @@ const Dashboard = () => {
   } = useBoardsStore();
 
   const [showCreate, setShowCreate] = useState(false);
+  const [editingBoard, setEditingBoard] = useState<Board | null>(null);
   const [deletingBoardId, setDeletingBoardId] = useState<string | null>(null);
   const { user } = useAuth();
   const { socket, isConnected } = useSocket();
@@ -125,6 +128,7 @@ const Dashboard = () => {
                   board={board}
                   index={i}
                   isDeleting={deletingBoardId === board.id}
+                  onEdit={(selectedBoard) => setEditingBoard(selectedBoard)}
                   onDelete={async (boardId) => {
                     setDeletingBoardId(boardId);
                     try {
@@ -173,6 +177,11 @@ const Dashboard = () => {
 
         {/* Create Board Modal */}
         <CreateBoardModal open={showCreate} onClose={() => setShowCreate(false)} />
+        <EditBoardModal
+          open={!!editingBoard}
+          board={editingBoard}
+          onClose={() => setEditingBoard(null)}
+        />
       </div>
     </AppLayout>
   );

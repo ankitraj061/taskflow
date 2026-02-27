@@ -1,12 +1,13 @@
 import { Board } from "@/types/board.types";
 import { Link } from "react-router-dom";
-import { Trash2, Users, Calendar, Loader2 } from "lucide-react";
+import { Trash2, Users, Calendar, Loader2, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface Props {
   board: Board;
   index: number;
   isDeleting?: boolean;
+  onEdit: (board: Board) => void;
   onDelete: (boardId: string) => void;
 }
 
@@ -19,7 +20,7 @@ const ACCENT_COLORS = [
   "hsl(190, 80%, 45%)",
 ];
 
-export const BoardCard = ({ board, index, isDeleting = false, onDelete }: Props) => {
+export const BoardCard = ({ board, index, isDeleting = false, onEdit, onDelete }: Props) => {
   const colorClass = ACCENT_COLORS[index % ACCENT_COLORS.length];
 
   return (
@@ -37,23 +38,38 @@ export const BoardCard = ({ board, index, isDeleting = false, onDelete }: Props)
           <h3 className="font-semibold text-base text-card-foreground group-hover:text-primary transition-colors duration-200">
             {board.title}
           </h3>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-7 w-7 p-0 opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-all disabled:opacity-100"
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              onDelete(board.id);
-            }}
-            disabled={isDeleting}
-          >
-            {isDeleting ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            ) : (
-              <Trash2 className="h-3.5 w-3.5" />
-            )}
-          </Button>
+          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 w-7 p-0 text-muted-foreground hover:text-primary"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                onEdit(board);
+              }}
+              disabled={isDeleting}
+            >
+              <Pencil className="h-3.5 w-3.5" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive disabled:opacity-100"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                onDelete(board.id);
+              }}
+              disabled={isDeleting}
+            >
+              {isDeleting ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Trash2 className="h-3.5 w-3.5" />
+              )}
+            </Button>
+          </div>
         </div>
         {board.description && (
           <p className="text-sm text-muted-foreground mt-2 line-clamp-2 leading-relaxed">{board.description}</p>

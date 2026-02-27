@@ -65,8 +65,9 @@ const PRESET_COLORS = [
 
 export const TaskDetailModal = ({ task, open, onClose }: Props) => {
   const { boardId } = useParams<{ boardId: string }>();
-  const { board, updateTask, deleteTask, addLabel, removeLabel, assignUser, unassignUser } =
+  const { board, currentUserRole, updateTask, deleteTask, addLabel, removeLabel, assignUser, unassignUser } =
     useBoardStore();
+  const canEditTask = currentUserRole === "ADMIN";
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -119,12 +120,19 @@ export const TaskDetailModal = ({ task, open, onClose }: Props) => {
     }
   }, [task]);
 
+  useEffect(() => {
+    if (!canEditTask && isEditing) {
+      setIsEditing(false);
+    }
+  }, [canEditTask, isEditing]);
+
   if (!task || !boardId) return null;
 
   const startDateStatus = getDateStatus(task.startDate);
   const endDateStatus = getDateStatus(task.endDate);
 
   const handleSave = async () => {
+    if (!canEditTask) return;
     if (!title.trim()) {
       toast.error("Task title is required");
       return;
@@ -156,6 +164,7 @@ export const TaskDetailModal = ({ task, open, onClose }: Props) => {
   };
 
   const handleDelete = async () => {
+    if (!canEditTask) return;
     if (!confirm("Delete this task?")) return;
 
     setIsDeleting(true);
@@ -172,6 +181,7 @@ export const TaskDetailModal = ({ task, open, onClose }: Props) => {
   };
 
   const handleAddLabel = async () => {
+    if (!canEditTask) return;
     if (!newLabelName.trim()) {
       toast.error("Label name is required");
       return;
@@ -192,6 +202,7 @@ export const TaskDetailModal = ({ task, open, onClose }: Props) => {
   };
 
   const handleRemoveLabel = async (labelId: string) => {
+    if (!canEditTask) return;
     setRemovingLabelId(labelId);
     try {
       await removeLabel(boardId, task.id, labelId);
@@ -205,6 +216,7 @@ export const TaskDetailModal = ({ task, open, onClose }: Props) => {
   };
 
   const handleAssignUser = async (userId: string) => {
+    if (!canEditTask) return;
     setAssigningUserId(userId);
     try {
       await assignUser(boardId, task.id, userId);
@@ -218,6 +230,7 @@ export const TaskDetailModal = ({ task, open, onClose }: Props) => {
   };
 
   const handleUnassignUser = async (userId: string) => {
+    if (!canEditTask) return;
     setUnassigningUserId(userId);
     try {
       await unassignUser(boardId, task.id, userId);
@@ -255,8 +268,8 @@ export const TaskDetailModal = ({ task, open, onClose }: Props) => {
                 />
               ) : (
                 <DialogTitle
-                  className="cursor-pointer hover:bg-muted/50 px-2 py-1 rounded"
-                  onClick={() => setIsEditing(true)}
+                  className={canEditTask ? "cursor-pointer hover:bg-muted/50 px-2 py-1 rounded" : "px-2 py-1 rounded"}
+                  onClick={canEditTask ? () => setIsEditing(true) : undefined}
                 >
                   {task.title}
                 </DialogTitle>
@@ -273,59 +286,61 @@ export const TaskDetailModal = ({ task, open, onClose }: Props) => {
                 <Tag className="h-4 w-4 text-primary" />
                 Labels
               </h3>
-              <Popover open={showLabelPopover} onOpenChange={setShowLabelPopover}>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" size="sm" className="h-7 text-xs shadow-sm hover:shadow-md">
-                    <Tag className="h-3 w-3 mr-1" />
-                    Add Label
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-72">
-                  <div className="space-y-3">
-                    <h4 className="font-semibold text-sm">Create Label</h4>
-                    <Input
-                      placeholder="Label name"
-                      value={newLabelName}
-                      onChange={(e) => setNewLabelName(e.target.value)}
-                      onKeyDown={(e) => e.key === "Enter" && handleAddLabel()}
-                    />
-                    <div>
-                      <p className="text-xs text-muted-foreground mb-2">
-                        Select color
-                      </p>
-                      <div className="grid grid-cols-8 gap-2">
-                        {PRESET_COLORS.map((color) => (
-                          <button
-                            key={color}
-                            className={`h-6 w-6 rounded-full transition-transform hover:scale-110 ${
-                              selectedColor === color
-                                ? "ring-2 ring-offset-2 ring-primary"
-                                : ""
-                            }`}
-                            style={{ backgroundColor: color }}
-                            onClick={() => setSelectedColor(color)}
-                          />
-                        ))}
-                      </div>
-                    </div>
-                    <Button
-                      onClick={handleAddLabel}
-                      className="w-full"
-                      size="sm"
-                      disabled={isAddingLabel}
-                    >
-                      {isAddingLabel ? (
-                        <>
-                          <Loader2 className="h-3.5 w-3.5 mr-2 animate-spin" />
-                          Creating...
-                        </>
-                      ) : (
-                        "Create"
-                      )}
+              {canEditTask && (
+                <Popover open={showLabelPopover} onOpenChange={setShowLabelPopover}>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" size="sm" className="h-7 text-xs shadow-sm hover:shadow-md">
+                      <Tag className="h-3 w-3 mr-1" />
+                      Add Label
                     </Button>
-                  </div>
-                </PopoverContent>
-              </Popover>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-72">
+                    <div className="space-y-3">
+                      <h4 className="font-semibold text-sm">Create Label</h4>
+                      <Input
+                        placeholder="Label name"
+                        value={newLabelName}
+                        onChange={(e) => setNewLabelName(e.target.value)}
+                        onKeyDown={(e) => e.key === "Enter" && handleAddLabel()}
+                      />
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-2">
+                          Select color
+                        </p>
+                        <div className="grid grid-cols-8 gap-2">
+                          {PRESET_COLORS.map((color) => (
+                            <button
+                              key={color}
+                              className={`h-6 w-6 rounded-full transition-transform hover:scale-110 ${
+                                selectedColor === color
+                                  ? "ring-2 ring-offset-2 ring-primary"
+                                  : ""
+                              }`}
+                              style={{ backgroundColor: color }}
+                              onClick={() => setSelectedColor(color)}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                      <Button
+                        onClick={handleAddLabel}
+                        className="w-full"
+                        size="sm"
+                        disabled={isAddingLabel}
+                      >
+                        {isAddingLabel ? (
+                          <>
+                            <Loader2 className="h-3.5 w-3.5 mr-2 animate-spin" />
+                            Creating...
+                          </>
+                        ) : (
+                          "Create"
+                        )}
+                      </Button>
+                    </div>
+                  </PopoverContent>
+                </Popover>
+              )}
             </div>
             <div className="flex gap-2 flex-wrap">
               {task.labels.length === 0 ? (
@@ -343,17 +358,19 @@ export const TaskDetailModal = ({ task, open, onClose }: Props) => {
                     }}
                   >
                     {label.name}
-                    <button
-                      onClick={() => handleRemoveLabel(label.id)}
-                      disabled={removingLabelId === label.id}
-                      className="ml-1 opacity-0 group-hover:opacity-100 transition-opacity disabled:opacity-100"
-                    >
-                      {removingLabelId === label.id ? (
-                        <Loader2 className="h-3 w-3 animate-spin" />
-                      ) : (
-                        <X className="h-3 w-3" />
-                      )}
-                    </button>
+                    {canEditTask && (
+                      <button
+                        onClick={() => handleRemoveLabel(label.id)}
+                        disabled={removingLabelId === label.id}
+                        className="ml-1 opacity-0 group-hover:opacity-100 transition-opacity disabled:opacity-100"
+                      >
+                        {removingLabelId === label.id ? (
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                        ) : (
+                          <X className="h-3 w-3" />
+                        )}
+                      </button>
+                    )}
                   </Badge>
                 ))
               )}
@@ -367,116 +384,118 @@ export const TaskDetailModal = ({ task, open, onClose }: Props) => {
                 <Users className="h-4 w-4 text-primary" />
                 Assignees
               </h3>
-              <Popover open={showAssignPopover} onOpenChange={setShowAssignPopover}>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" size="sm" className="h-7 text-xs shadow-sm hover:shadow-md">
-                    <Users className="h-3 w-3 mr-1" />
-                    Assign
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-64">
-                  <div className="space-y-2">
-                    <h4 className="font-semibold text-sm">Assign Members</h4>
+              {canEditTask && (
+                <Popover open={showAssignPopover} onOpenChange={setShowAssignPopover}>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" size="sm" className="h-7 text-xs shadow-sm hover:shadow-md">
+                      <Users className="h-3 w-3 mr-1" />
+                      Assign
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-64">
+                    <div className="space-y-2">
+                      <h4 className="font-semibold text-sm">Assign Members</h4>
                     
-                    {/* Owner */}
-                    {board?.owner && (
-                      <div className="flex items-center justify-between p-2 rounded hover:bg-muted/50">
-                        <div className="flex items-center gap-2">
-                          <div className="h-6 w-6 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-medium">
-                            {board.owner.name.charAt(0)}
+                      {/* Owner */}
+                      {board?.owner && (
+                        <div className="flex items-center justify-between p-2 rounded hover:bg-muted/50">
+                          <div className="flex items-center gap-2">
+                            <div className="h-6 w-6 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-medium">
+                              {board.owner.name.charAt(0)}
+                            </div>
+                            <div>
+                              <p className="text-xs font-medium">{board.owner.name}</p>
+                              <p className="text-[10px] text-muted-foreground">
+                                Owner
+                              </p>
+                            </div>
                           </div>
-                          <div>
-                            <p className="text-xs font-medium">{board.owner.name}</p>
-                            <p className="text-[10px] text-muted-foreground">
-                              Owner
-                            </p>
-                          </div>
+                          {isAssigned(board.owner.id) ? (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-6 text-xs"
+                              onClick={() => handleUnassignUser(board.owner.id)}
+                              disabled={unassigningUserId === board.owner.id}
+                            >
+                              {unassigningUserId === board.owner.id ? (
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                              ) : (
+                                "Remove"
+                              )}
+                            </Button>
+                          ) : (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-6 text-xs"
+                              onClick={() => handleAssignUser(board.owner.id)}
+                              disabled={assigningUserId === board.owner.id}
+                            >
+                              {assigningUserId === board.owner.id ? (
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                              ) : (
+                                "Assign"
+                              )}
+                            </Button>
+                          )}
                         </div>
-                        {isAssigned(board.owner.id) ? (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-6 text-xs"
-                            onClick={() => handleUnassignUser(board.owner.id)}
-                            disabled={unassigningUserId === board.owner.id}
-                          >
-                            {unassigningUserId === board.owner.id ? (
-                              <Loader2 className="h-3 w-3 animate-spin" />
-                            ) : (
-                              "Remove"
-                            )}
-                          </Button>
-                        ) : (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="h-6 text-xs"
-                            onClick={() => handleAssignUser(board.owner.id)}
-                            disabled={assigningUserId === board.owner.id}
-                          >
-                            {assigningUserId === board.owner.id ? (
-                              <Loader2 className="h-3 w-3 animate-spin" />
-                            ) : (
-                              "Assign"
-                            )}
-                          </Button>
-                        )}
-                      </div>
-                    )}
+                      )}
 
-                    {/* Members */}
-                    {board?.members.map((member) => (
-                      <div
-                        key={member.id}
-                        className="flex items-center justify-between p-2 rounded hover:bg-muted/50"
-                      >
-                        <div className="flex items-center gap-2">
-                          <div className="h-6 w-6 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-medium">
-                            {member.user.name.charAt(0)}
+                      {/* Members */}
+                      {board?.members.map((member) => (
+                        <div
+                          key={member.id}
+                          className="flex items-center justify-between p-2 rounded hover:bg-muted/50"
+                        >
+                          <div className="flex items-center gap-2">
+                            <div className="h-6 w-6 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-medium">
+                              {member.user.name.charAt(0)}
+                            </div>
+                            <div>
+                              <p className="text-xs font-medium">
+                                {member.user.name}
+                              </p>
+                              <p className="text-[10px] text-muted-foreground">
+                                {member.role}
+                              </p>
+                            </div>
                           </div>
-                          <div>
-                            <p className="text-xs font-medium">
-                              {member.user.name}
-                            </p>
-                            <p className="text-[10px] text-muted-foreground">
-                              {member.role}
-                            </p>
-                          </div>
+                          {isAssigned(member.userId) ? (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-6 text-xs"
+                              onClick={() => handleUnassignUser(member.userId)}
+                              disabled={unassigningUserId === member.userId}
+                            >
+                              {unassigningUserId === member.userId ? (
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                              ) : (
+                                "Remove"
+                              )}
+                            </Button>
+                          ) : (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-6 text-xs"
+                              onClick={() => handleAssignUser(member.userId)}
+                              disabled={assigningUserId === member.userId}
+                            >
+                              {assigningUserId === member.userId ? (
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                              ) : (
+                                "Assign"
+                              )}
+                            </Button>
+                          )}
                         </div>
-                        {isAssigned(member.userId) ? (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-6 text-xs"
-                            onClick={() => handleUnassignUser(member.userId)}
-                            disabled={unassigningUserId === member.userId}
-                          >
-                            {unassigningUserId === member.userId ? (
-                              <Loader2 className="h-3 w-3 animate-spin" />
-                            ) : (
-                              "Remove"
-                            )}
-                          </Button>
-                        ) : (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="h-6 text-xs"
-                            onClick={() => handleAssignUser(member.userId)}
-                            disabled={assigningUserId === member.userId}
-                          >
-                            {assigningUserId === member.userId ? (
-                              <Loader2 className="h-3 w-3 animate-spin" />
-                            ) : (
-                              "Assign"
-                            )}
-                          </Button>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </PopoverContent>
-              </Popover>
+                      ))}
+                    </div>
+                  </PopoverContent>
+                </Popover>
+              )}
             </div>
             <div className="flex gap-2 flex-wrap">
               {task.assignees.length === 0 ? (
@@ -491,17 +510,19 @@ export const TaskDetailModal = ({ task, open, onClose }: Props) => {
                       {assignee.user.name.charAt(0)}
                     </div>
                     <span className="text-xs">{assignee.user.name}</span>
-                    <button
-                      onClick={() => handleUnassignUser(assignee.user.id)}
-                      disabled={unassigningUserId === assignee.user.id}
-                      className="opacity-0 group-hover:opacity-100 transition-opacity disabled:opacity-100"
-                    >
-                      {unassigningUserId === assignee.user.id ? (
-                        <Loader2 className="h-3 w-3 animate-spin" />
-                      ) : (
-                        <X className="h-3 w-3" />
-                      )}
-                    </button>
+                    {canEditTask && (
+                      <button
+                        onClick={() => handleUnassignUser(assignee.user.id)}
+                        disabled={unassigningUserId === assignee.user.id}
+                        className="opacity-0 group-hover:opacity-100 transition-opacity disabled:opacity-100"
+                      >
+                        {unassigningUserId === assignee.user.id ? (
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                        ) : (
+                          <X className="h-3 w-3" />
+                        )}
+                      </button>
+                    )}
                   </div>
                 ))
               )}
@@ -710,8 +731,10 @@ export const TaskDetailModal = ({ task, open, onClose }: Props) => {
               />
             ) : (
               <div
-                className="text-sm text-muted-foreground cursor-pointer hover:bg-muted/50 px-2 py-2 rounded min-h-[60px]"
-                onClick={() => setIsEditing(true)}
+                className={`text-sm text-muted-foreground px-2 py-2 rounded min-h-[60px] ${
+                  canEditTask ? "cursor-pointer hover:bg-muted/50" : ""
+                }`}
+                onClick={canEditTask ? () => setIsEditing(true) : undefined}
               >
                 {description || "Add a more detailed description..."}
               </div>
@@ -734,7 +757,7 @@ export const TaskDetailModal = ({ task, open, onClose }: Props) => {
 
           {/* Actions */}
           <div className="flex items-center justify-between pt-4 border-t border-border/50">
-            {isEditing ? (
+            {canEditTask && isEditing ? (
               <div className="flex gap-2">
                 <Button onClick={handleSave} disabled={isSaving} size="sm">
                   {isSaving ? (
@@ -764,7 +787,7 @@ export const TaskDetailModal = ({ task, open, onClose }: Props) => {
                   Cancel
                 </Button>
               </div>
-            ) : (
+            ) : canEditTask ? (
               <Button
                 variant="outline"
                 onClick={() => setIsEditing(true)}
@@ -773,26 +796,32 @@ export const TaskDetailModal = ({ task, open, onClose }: Props) => {
               >
                 Edit Task
               </Button>
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                Workers can only drag and drop assigned tasks.
+              </p>
             )}
-            <Button
-              variant="destructive"
-              onClick={handleDelete}
-              size="sm"
-              className="gap-1.5"
-              disabled={isDeleting}
-            >
-              {isDeleting ? (
-                <>
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  Deleting...
-                </>
-              ) : (
-                <>
-                  <Trash2 className="h-3.5 w-3.5" />
-                  Delete
-                </>
-              )}
-            </Button>
+            {canEditTask && (
+              <Button
+                variant="destructive"
+                onClick={handleDelete}
+                size="sm"
+                className="gap-1.5"
+                disabled={isDeleting}
+              >
+                {isDeleting ? (
+                  <>
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    Deleting...
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="h-3.5 w-3.5" />
+                    Delete
+                  </>
+                )}
+              </Button>
+            )}
           </div>
         </div>
       </DialogContent>

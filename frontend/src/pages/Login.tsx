@@ -1,7 +1,7 @@
-// pages/Login.tsx
+
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { useAuth } from "@/contexts/AuthContext"; // <-- use context
+import { useAuth } from "@/contexts/AuthContext"; 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -9,12 +9,12 @@ import { Kanban, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 const Login = () => {
-  const [email, setEmail] = useState("alex@example.com");
-  const [password, setPassword] = useState("password");
+  const [email, setEmail] = useState("ankitraj.me1@gmail.com");
+  const [password, setPassword] = useState("Ankit@12");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
-  const { login } = useAuth(); // <-- get login function
+  const { login } = useAuth(); 
   const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {

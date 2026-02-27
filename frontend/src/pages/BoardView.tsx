@@ -58,8 +58,12 @@ const BoardView = () => {
   const [isMovingTask, setIsMovingTask] = useState(false);
 
   const handleTaskClick = (task: Task) => {
-  setSelectedTask(task);
-};
+    if (!isAdmin) {
+      toast.info("Workers can only move tasks assigned to them");
+      return;
+    }
+    setSelectedTask(task);
+  };
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } })

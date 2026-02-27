@@ -111,9 +111,21 @@ export const KanbanList = ({ list, boardId, isAdmin = true, onTaskClick }: Props
               className="h-7 text-xs font-semibold uppercase"
               disabled={isUpdatingList}
             />
-            {isUpdatingList && (
-              <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
-            )}
+            <Button
+              size="sm"
+              className="h-7 px-2 text-xs"
+              onClick={handleUpdateList}
+              disabled={isUpdatingList}
+            >
+              {isUpdatingList ? (
+                <>
+                  <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                  Updating...
+                </>
+              ) : (
+                "Update"
+              )}
+            </Button>
           </div>
         ) : (
           <div className="flex items-center gap-2">

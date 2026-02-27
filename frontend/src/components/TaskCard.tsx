@@ -1,5 +1,4 @@
 import { useBoardStore } from "@/stores/useBoardStore";
-import { useAuth } from "@/contexts/AuthContext";
 import type { Task } from "@/types/board.types";
 import { Calendar, Clock } from "lucide-react";
 
@@ -22,12 +21,8 @@ const getDateStatus = (date: string | null | undefined): "overdue" | "today" | "
 
 export const TaskCard = ({ task, onClick }: Props) => {
   const { currentUserRole } = useBoardStore();
-  const { user } = useAuth();
 
   const isAdmin = currentUserRole === "ADMIN";
-  const isAssignedToMe = user
-    ? task.assignees.some((a) => a.user.id === user.id)
-    : false;
 
   const endDateStatus = getDateStatus(task.endDate);
   const startDateStatus = getDateStatus(task.startDate);
@@ -123,7 +118,7 @@ export const TaskCard = ({ task, onClick }: Props) => {
             </div>
           )}
         </div>
-        {(isAdmin || isAssignedToMe) && (
+        {isAdmin && (
           <div className="text-xs text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity">
             Click to edit
           </div>
